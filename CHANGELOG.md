@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `mcp-scripting` skill is about half its former length; `jev.evaluate` details moved to `references/jev.md`.
+- The `mcpScript` description now says that a tool call's `data` is the raw MCP result and how to read JSON from it.
 
 ### Fixed
 
