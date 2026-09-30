@@ -145,7 +145,7 @@ export interface UiServerHandle {
     sessionToken: string;
     serverName: string;
     toolName: string;
-    viewer?: "browser" | "glimpse" | "orca" | "suppressed";
+    viewer?: "browser" | "glimpse" | "orca" | "suppressed" | "managed";
     windowOpen?: boolean;
     close: (reason?: string) => void;
     sendToolInput: (args: Record<string, unknown>) => void;
@@ -452,6 +452,8 @@ export interface McpSettings {
     toolResultRendering?: "compact" | "boxed";
     /** Number of result text lines to show before expansion. Supports 1, 2, or 3. Defaults to 1 in compact mode and 3 in boxed mode. */
     collapsedResultLines?: 1 | 2 | 3;
+    /** Absolute App-only viewer executable. Receives versioned JSON on stdin for ensure/close; zero exit confirms completion. OAuth keeps BROWSER. */
+    uiViewerCommand?: string;
     /** Default approval gate for matching tools/resources; per-server settings override it. */
     approveTools?: boolean | string[];
     disableProxyTool?: boolean;

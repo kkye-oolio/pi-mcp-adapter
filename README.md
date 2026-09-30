@@ -4,6 +4,8 @@
 
 # Pi MCP Adapter
 
+Maintained fork: [kkye-oolio/pi-mcp-adapter](https://github.com/kkye-oolio/pi-mcp-adapter). It adds opt-in session-owned App viewers and explicit App-message provenance. Changes are maintained here, not submitted to the original repository.
+
 Use MCP servers with [Pi](https://github.com/badlogic/pi-mono/) without burning your context window.
 
 https://github.com/user-attachments/assets/4b7c66ff-e27e-4639-b195-22c3db406a5a
@@ -19,7 +21,7 @@ But the MCP ecosystem has useful stuff - databases, browsers, APIs. This adapter
 ## Install
 
 ```bash
-pi install npm:pi-mcp-adapter
+pi install git:github.com/kkye-oolio/pi-mcp-adapter@<verified-commit>
 ```
 
 Restart Pi after installation.
@@ -912,7 +914,27 @@ MCP servers can ship interactive UIs via the [MCP UI](https://github.com/MCP-UI-
 
 **Native rendering:** On macOS, if [Glimpse](https://github.com/hazat/glimpse) is installed (`pi install npm:glimpseui`), UIs open in a native WKWebView window instead of a browser tab. Set `MCP_UI_VIEWER=browser` to force the browser, `MCP_UI_VIEWER=glimpse` to require native rendering, `MCP_UI_VIEWER=orca` to open in the [Orca](https://github.com/orca) built-in browser (falls back to the system browser if Orca is unavailable), or `MCP_UI_VIEWER=none` (also accepts `off` / `disabled`) to suppress the window entirely — the tool still runs and its inline result is returned to the agent, but no browser or native window opens. This is useful for headless setups, CI, or users who want the tool output delivered inline as text only. When suppressed, a one-line info notification shows the UI URL so it can still be opened manually if needed.
 
-**Bidirectional communication:** The UI talks back. When it sends a prompt or intent, the message is stored and `triggerTurn()` wakes the agent. The agent retrieves messages via `mcp({ action: "ui-messages" })` and responds, enabling conversational UIs where the app and agent collaborate in real-time.
+**Managed App viewer:** Set `settings.uiViewerCommand` to an absolute executable path in adapter configuration. This is an App-only entry point; OAuth and ordinary links retain `BROWSER`. The configured viewer is used instead of automatic Glimpse/Orca selection. Explicit `MCP_UI_VIEWER=none` suppression still applies.
+
+The executable receives one JSON request on stdin, with no shell or argv containing the App URL:
+
+```json
+{
+  "version": 1,
+  "action": "ensure",
+  "harness": "pi",
+  "sessionId": "caller-session",
+  "serverName": "example",
+  "toolName": "chart",
+  "url": "http://localhost:3000/?session=opaque-token"
+}
+```
+
+`ensure` must idempotently show the caller's owned view and return promptly with exit code zero once ready. It runs on initial presentation and same-tool reuse, so closing the view does not make later invocations update an invisible window. `close` requests use the same captured identity and URL, with optional reason `replaced`, `completed`, `runtime_stopped` or `failed`. Replacement retains the owned pane; final cleanup releases only still-owned resources. An old URL's delayed close must not affect a newer view.
+
+The adapter bounds launcher execution to 10 seconds and output to 16 KiB, rejects launcher failures without a desktop fallback, and omits managed capability URLs from tool-result summaries. A trusted session identity is required. The viewer itself must verify ownership before navigation or cleanup. Authentication, tool filtering, approval and CSP remain in the adapter's existing paths.
+
+**Bidirectional communication:** App prompts, intents and context can wake the agent and are retrievable with `mcp({ action: "ui-messages" })`. They are labelled App-originated content, not verified human instructions or authorization. Restricted actions still require the harness's independent authorization mechanism.
 
 **Session reuse:** When the agent calls the same tool again while its UI is already open, the adapter pushes the new result to the existing window instead of replacing it. This enables live updates — the agent can refine a chart, add data, or respond to user input without losing the current view. Different tools still replace the session as before.
 
@@ -920,7 +942,7 @@ MCP servers can ship interactive UIs via the [MCP UI](https://github.com/MCP-UI-
 
 | Type | Purpose |
 |------|---------|
-| `prompt` | User message that triggers an agent response |
+| `prompt` | App-originated message that triggers an agent response |
 | `intent` | Structured action with name + params |
 | `notify` | Fire-and-forget notification |
 | `message` | Generic message payload |

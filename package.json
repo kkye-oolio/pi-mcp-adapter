@@ -59,7 +59,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nicobailon/pi-mcp-adapter.git"
+    "url": "git+https://github.com/kkye-oolio/pi-mcp-adapter.git"
   },
   "keywords": [
     "pi-package",
@@ -98,6 +98,13 @@
     "init.ts",
     "failure-backoff.ts",
     "ui-session.ts",
+    "ui-viewer.ts",
+    "managed-ui-viewer.ts",
+    "herdr-viewer/cli.mjs",
+    "herdr-viewer/controller.mjs",
+    "herdr-viewer/request.mjs",
+    "herdr-viewer/runner.mjs",
+    "herdr-viewer/runtime.mjs",
     "proxy-modes.ts",
     "direct-tools.ts",
     "direct-tool-surface.ts",

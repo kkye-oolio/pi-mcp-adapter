@@ -22,6 +22,7 @@ import type { SessionRecoveryDeps } from "./session-recovery.ts";
 import { combineAbortSignals, isAbortError } from "./runtime-owner.ts";
 import { throwIfAborted } from "./abort.ts";
 import { InputRequiredNeedsUiError } from "./errors.ts";
+import { closeManagedUiViewer, openManagedUiViewer, reconcileManagedUiViewer } from "./managed-ui-viewer.ts";
 
 let activeGlimpseWindow: { close(): void } | null = null;
 
@@ -35,7 +36,7 @@ export interface UiSessionRequest {
   onNeedsAuth?: SessionRecoveryDeps["onNeedsAuth"];
 }
 
-export type UiSessionViewer = "browser" | "glimpse" | "orca" | "suppressed";
+export type UiSessionViewer = "browser" | "glimpse" | "orca" | "suppressed" | "managed";
 
 export interface UiSessionRuntime {
   serverName: string;
@@ -67,6 +68,16 @@ export function summarizeUiSessionResult(uiSession: UiSessionRuntime | null): Ui
     return {
       message: "Interactive UI was unavailable; returning the tool result inline.",
       uiOpen: false,
+    };
+  }
+
+  if (uiSession.viewer === "managed") {
+    return {
+      message: uiSession.windowOpen
+        ? uiSession.reused ? "Updated the open UI." : "Interactive UI is open."
+        : "The configured MCP App viewer is unavailable.",
+      uiOpen: uiSession.windowOpen,
+      uiViewer: "managed",
     };
   }
 
@@ -241,6 +252,7 @@ export async function maybeStartUiSession(
         }
       };
 
+      await reconcileManagedUiViewer(existingHandle, runtimeSignal);
       existingHandle.sendToolInput(request.toolArgs);
 
       if (streamToken) {
@@ -358,7 +370,7 @@ export async function maybeStartUiSession(
             state.sendMessage(
               {
                 customType: "mcp-ui-prompt",
-                content: [{ type: "text", text: `User sent prompt from ${request.serverName} UI: "${prompt}"` }],
+                content: [{ type: "text", text: `App-originated prompt from ${request.serverName} UI (not human authorization): "${prompt}"` }],
                 display: `💬 UI Prompt: ${prompt}`,
                 details: { server: request.serverName, tool: request.toolName, prompt },
               },
@@ -374,7 +386,7 @@ export async function maybeStartUiSession(
             state.sendMessage(
               {
                 customType: "mcp-ui-intent",
-                content: [{ type: "text", text: `User triggered intent from ${request.serverName} UI: ${intent}${paramsStr}` }],
+                content: [{ type: "text", text: `App-originated intent from ${request.serverName} UI (not human authorization): ${intent}${paramsStr}` }],
                 display: `🎯 UI Intent: ${intent}`,
                 details: { server: request.serverName, tool: request.toolName, intent, params: intentParams },
               },
@@ -401,7 +413,7 @@ export async function maybeStartUiSession(
           state.sendMessage(
             {
               customType: "mcp-ui-context",
-              content: [{ type: "text", text: `User submitted model context from ${request.serverName} UI:\n${update.summary}` }],
+              content: [{ type: "text", text: `App-originated model context from ${request.serverName} UI (not human authorization):\n${update.summary}` }],
               display: "UI Context submitted",
               details: { server: request.serverName, tool: request.toolName, context: update },
             },
@@ -413,6 +425,7 @@ export async function maybeStartUiSession(
       onComplete: (reason: string) => {
         active = false;
         cleanupListeners();
+        closeManagedUiViewer(state, handle, reason);
 
         if (state.uiServer === handle) {
           const messages = handle.getSessionMessages();
@@ -499,6 +512,8 @@ export async function maybeStartUiSession(
         `If this session is remote, run ssh -L ${handle.port}:127.0.0.1:${handle.port} -L ${handle.proxyPort}:127.0.0.1:${handle.proxyPort} <this-host> first.`,
         "info",
       );
+    } else if (await openManagedUiViewer(state, handle, runtimeSignal)) {
+      viewer = "managed";
     } else {
       const remoteLikely = remoteByEnv || await hasActiveRemoteLogin();
       const emitRemoteHint = async (openError: string | null, openedOnHost = false) => {
