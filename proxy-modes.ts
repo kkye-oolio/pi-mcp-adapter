@@ -12,7 +12,7 @@ import { renderTsShape } from "./ts-shape.ts";
 import { getObservedOutput, recordObservedOutput, renderOutputShape } from "./output-shape.ts";
 import { reconstructPromptMetadata } from "./metadata-cache.ts";
 import { resolveMcpResultContent, transformMcpResourceContents } from "./tool-registrar.ts";
-import { guardMcpOutput, guardedMcpDetails, resolveMcpOutputGuardOptions } from "./mcp-output-guard.ts";
+import { guardMcpOutput, guardedMcpDetails, resolveMcpOutputGuardOptions, scriptPipeHint } from "./mcp-output-guard.ts";
 import { maybeStartUiSession, summarizeUiSessionResult, type UiSessionRuntime } from "./ui-session.ts";
 import { formatAuthRequiredMessage, formatMcpStatus, normalizeToolArguments, resolveServerUrl, truncateAtWord, withToolCallIdMeta } from "./utils.ts";
 import { authenticate, completeAuthFromInput, getAuthStatus, startAuth, supportsOAuth } from "./mcp-auth-flow.ts";
@@ -1714,7 +1714,7 @@ export async function executeCall(
 
     const content = resolveMcpResultContent(result as Record<string, unknown>, state.owner?.signal);
     const outputContent = content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }];
-    const guarded = await guardMcpOutput(outputContent, { ...outputGuardOptions, rawMcpResult: result });
+    const guarded = await guardMcpOutput(outputContent, { ...outputGuardOptions, ...scriptPipeHint(state.config.settings, outputContent), rawMcpResult: result });
     return {
       content: guarded.content,
       details: { mode: "call", ...guardedMcpDetails(guarded), ...callIdentity },

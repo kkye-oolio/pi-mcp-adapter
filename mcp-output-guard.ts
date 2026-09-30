@@ -14,6 +14,7 @@ import type { ContentBlock, McpSettings } from "./types.ts";
 export const DEFAULT_MCP_OUTPUT_MAX_BYTES = DEFAULT_MAX_BYTES;
 export const DEFAULT_MCP_OUTPUT_MAX_LINES = DEFAULT_MAX_LINES;
 export const DEFAULT_MCP_DETAILS_MAX_BYTES = 16 * 1024;
+const SCRIPT_PIPE_HINT_MIN_CHARS = 8 * 1024;
 
 const CONTENT_SUMMARY_LIMIT = 20;
 const KEY_PREVIEW_LIMIT = 20;
@@ -91,6 +92,18 @@ export function resolveMcpOutputGuardOptions(settings?: McpSettings): Pick<McpOu
     maxLines: positiveInt(tuning?.maxLines) ?? DEFAULT_MCP_OUTPUT_MAX_LINES,
     detailsMaxBytes: positiveInt(tuning?.detailsMaxBytes) ?? DEFAULT_MCP_DETAILS_MAX_BYTES,
   };
+}
+
+/**
+ * Models retype large results into the next call's arguments unless told otherwise at the moment
+ * they see the result; the same wording in tool descriptions did not change that.
+ */
+export function scriptPipeHint(settings: McpSettings | undefined, content: ContentBlock[]): { suffix?: string } {
+  if (settings?.scriptMode !== true) return {};
+  const chars = content.reduce((total, block) => total + (block.type === "text" ? block.text.length : 0), 0);
+  return chars >= SCRIPT_PIPE_HINT_MIN_CHARS
+    ? { suffix: "\n\n[To pass this result to another MCP call, use mcpScript so it is not copied through the conversation.]" }
+    : {};
 }
 
 /** Spread helper for tool-result details: includes mcpResult/outputGuard only when present. */
