@@ -12,16 +12,53 @@ const MAX_STDIN = 8192;
 const HERDR = "herdr";
 const CLI_PATH = resolve(process.argv[1]);
 
-function safeFailure() {
-  return new Error("Herdr App viewer operation failed");
+const SAFE_CODES = new Set([
+  "context", "request", "input", "slot_lock", "state", "pane_list_command",
+  "pane_list_response", "pane_process_info_command", "pane_process_info_response",
+  "pane_split_command", "pane_split_response", "pane_rename_command", "pane_run_command",
+  "pane_close_command", "browser_receipt", "browser_command", "browser_response",
+  "browser_start", "viewer_start", "unknown",
+]);
+
+const SAFE_MESSAGES = new Map([
+  ["viewer runtime context is unavailable", "context"],
+  ["viewer socket path must be absolute", "context"],
+  ["viewer slot is locked by another operation", "slot_lock"],
+  ["viewer state path is a symlink", "state"],
+  ["viewer state path has unexpected permissions", "state"],
+  ["viewer state directory belongs to another user", "state"],
+  ["Herdr pane list response is invalid", "pane_list_response"],
+  ["Herdr process information is invalid", "pane_process_info_response"],
+  ["Herdr pane split response is invalid", "pane_split_response"],
+  ["terminal-browser setup receipt is missing", "browser_receipt"],
+  ["terminal-browser setup receipt does not match this runtime", "browser_receipt"],
+  ["terminal-browser view could not be started", "browser_start"],
+  ["viewer runner exited before the view was ready", "viewer_start"],
+]);
+
+function safeFailure(code = "unknown") {
+  const error = new Error("Herdr App viewer operation failed");
+  Object.defineProperty(error, "diagnosticCode", { value: SAFE_CODES.has(code) ? code : "unknown" });
+  return error;
 }
 
-function parseJson(text, message) {
+function parseJson(text, message, code) {
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(message);
+    const error = new Error(message);
+    if (code && SAFE_CODES.has(code)) Object.defineProperty(error, "diagnosticCode", { value: code });
+    throw error;
   }
+}
+
+function safeDiagnosticCode(error) {
+  if (SAFE_CODES.has(error?.diagnosticCode)) return error.diagnosticCode;
+  if (error?.message?.startsWith("viewer request ")) return "request";
+  if (error?.message === "viewer request exceeds the input limit" || error?.message === "viewer request is empty") return "input";
+  if (error?.message === "terminal-browser response was not valid JSON") return "browser_response";
+  if (error?.message === "Herdr response was not valid JSON") return "pane_list_response";
+  return SAFE_MESSAGES.get(error?.message) ?? "unknown";
 }
 
 async function runExecutable(command, args, options = {}) {
@@ -37,13 +74,15 @@ async function runExecutable(command, args, options = {}) {
     return result;
   } catch {
     // Raw child errors and stderr can contain capability URLs or identifiers.
-    throw safeFailure();
+    throw safeFailure(options.failureCode);
   }
 }
 
-async function herdrJson(args) {
-  const { stdout } = await runExecutable(HERDR, args);
-  return parseJson(stdout, "Herdr response was not valid JSON");
+async function herdrJson(args, failureCode) {
+  const { stdout } = await runExecutable(HERDR, args, { failureCode });
+  const responseCode = failureCode === "pane_split_command" ? "pane_split_response"
+    : failureCode === "pane_process_info_command" ? "pane_process_info_response" : "pane_list_response";
+  return parseJson(stdout, "Herdr response was not valid JSON", responseCode);
 }
 
 function makeOps(context, store) {
@@ -54,34 +93,35 @@ function makeOps(context, store) {
       env: childEnv(context, { HERDR_PANE_ID: paneId }),
       timeout: 5_000,
       maxBuffer: 32_768,
+      failureCode: "browser_command",
     });
-    return parseJson(stdout, "terminal-browser response was not valid JSON");
+    return parseJson(stdout, "terminal-browser response was not valid JSON", "browser_response");
   }
 
   return {
     cliPath: CLI_PATH,
     async listPanes() {
-      const output = await herdrJson(["pane", "list"]);
+      const output = await herdrJson(["pane", "list"], "pane_list_command");
       return output?.result;
     },
     async processInfo(paneId) {
-      const output = await herdrJson(["pane", "process-info", "--pane", paneId]);
+      const output = await herdrJson(["pane", "process-info", "--pane", paneId], "pane_process_info_command");
       return output?.result;
     },
     async splitPane({ callerPaneId, direction, cwd, noFocus }) {
       const args = ["pane", "split", "--pane", callerPaneId, "--direction", direction, "--cwd", cwd];
       if (noFocus) args.push("--no-focus");
-      const output = await herdrJson(args);
+      const output = await herdrJson(args, "pane_split_command");
       return output?.result?.pane;
     },
     async renamePane(paneId, label) {
-      await runExecutable(HERDR, ["pane", "rename", paneId, label]);
+      await runExecutable(HERDR, ["pane", "rename", paneId, label], { failureCode: "pane_rename_command" });
     },
     async runPane(paneId, command) {
-      await runExecutable(HERDR, ["pane", "run", paneId, command]);
+      await runExecutable(HERDR, ["pane", "run", paneId, command], { failureCode: "pane_run_command" });
     },
     async closePane(paneId) {
-      await runExecutable(HERDR, ["pane", "close", paneId]);
+      await runExecutable(HERDR, ["pane", "close", paneId], { failureCode: "pane_close_command" });
     },
     async browserList(paneId) {
       return vendorJson(["ls", "--all", "--json"], paneId ?? context.paneId);
@@ -163,7 +203,7 @@ async function main() {
 
   const raw = await readStdin();
   if (raw.length === 0) fail("viewer request is empty");
-  const request = validateViewerRequest(parseJson(raw, "viewer request is invalid JSON"));
+  const request = validateViewerRequest(parseJson(raw, "viewer request is invalid JSON", "request"));
   const ops = makeOps(context, store);
   // Keep the shell string constant except for hex slot/nonce identifiers. Never
   // interpolate a URL, app name, session id or vendor-provided field.
@@ -175,7 +215,8 @@ async function main() {
 
 try {
   await main();
-} catch {
-  process.stderr.write("Herdr App viewer operation failed\n");
+} catch (error) {
+  const code = safeDiagnosticCode(error);
+  process.stderr.write(`Herdr App viewer operation failed (code=${code})\n`);
   process.exitCode = 1;
 }
