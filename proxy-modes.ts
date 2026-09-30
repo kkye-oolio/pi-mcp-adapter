@@ -1714,7 +1714,9 @@ export async function executeCall(
 
     const content = resolveMcpResultContent(result as Record<string, unknown>, state.owner?.signal);
     const outputContent = content.length > 0 ? content : [{ type: "text" as const, text: "(empty result)" }];
-    const guarded = await guardMcpOutput(outputContent, { ...outputGuardOptions, ...scriptPipeHint(state.config.settings, outputContent), rawMcpResult: result });
+    // Runtime event-bus callers ("script" origin) are extensions, not the model, so they get no hint.
+    const pipeHint = scriptPipeHint(origin !== "script" && state.scriptTool, outputContent);
+    const guarded = await guardMcpOutput(outputContent, { ...outputGuardOptions, ...pipeHint, rawMcpResult: result });
     return {
       content: guarded.content,
       details: { mode: "call", ...guardedMcpDetails(guarded), ...callIdentity },

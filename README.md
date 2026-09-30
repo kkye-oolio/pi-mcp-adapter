@@ -607,7 +607,7 @@ When any enabled server uses `eager` or `keep-alive`, initialization also starts
 | `directToolResultDetails` | Direct-tool result details: `"lean"` (default) or `"bounded"` to retain the guarded raw MCP result. |
 | `warnOnLargeDirectTools` | Show the advisory when 75 or more direct tools resolve (default: `true`). Set to `false` to suppress only this advisory. |
 | `freezeDirectTools` | Keep direct-tool registration stable after the initial sync so metadata updates and explicit reconnects do not rebuild the system prompt. Proxy/search/cache metadata still refreshes. Default: false. |
-| `scriptMode` | Register the MCP-only `mcpScript` plain-JavaScript tool and its bundled skill (default: false). |
+| `scriptMode` | Register the MCP-only `mcpScript` plain-JavaScript tool and its bundled skill (default: false). Read when Pi loads the adapter; run `/reload` after changing it. |
 | `scriptSkill` | How the model finds the bundled `mcp-scripting` skill when `scriptMode` is on: `"manual"` (default) keeps it to `/skill:mcp-scripting`; `"model"` adds its path to the `mcpScript` description so the model reads it before writing a script. |
 | `exposeResources` | Expose MCP resources as tools (default: `true`). Set to `false` to disable globally across all servers. Per-server `exposeResources` overrides this. |
 | `jev` | Optional System One Jev settings. A valid System One key enables semantic search across every enabled MCP server by default; `semanticSearch: false` disables it. `scriptEvaluation` remains disabled by default and requires an `allowedServers` source allowlist when enabled. `jev: false` disables both. Run `/mcp-adapter jev setup` for guided configuration. |

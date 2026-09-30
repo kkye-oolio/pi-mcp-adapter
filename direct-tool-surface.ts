@@ -199,8 +199,8 @@ export function resolveDirectTools(
  * Live counts/status belong to `mcp({ })`, full instructions to
  * `mcp({ instructions })`.
  */
-export function buildProxyDescription(config: McpConfig): string {
-  const scriptHint = config.settings?.scriptMode === true ? " When one request needs several MCP calls with logic between them, use mcpScript." : "";
+export function buildProxyDescription(config: McpConfig, scriptTool = false): string {
+  const scriptHint = scriptTool ? " When one request needs several MCP calls with logic between them, use mcpScript." : "";
   let desc = `MCP gateway — URL installation, server status, tool search/describe, auth, and single MCP tool calls. When a user supplies an MCP endpoint URL, install it with the install action.${scriptHint} Non-MCP Pi tools should be called directly, not through mcp.\n`;
 
   const serverNames = Object.keys(config.mcpServers)

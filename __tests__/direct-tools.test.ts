@@ -59,9 +59,9 @@ describe("formatToolName", () => {
 });
 
 describe("buildProxyDescription", () => {
-  it("points to mcpScript only when scriptMode is on", () => {
-    expect(buildProxyDescription({ mcpServers: {}, settings: { scriptMode: true } })).toContain("use mcpScript");
-    expect(buildProxyDescription({ mcpServers: {} })).not.toContain("mcpScript");
+  it("points to mcpScript only when it is registered", () => {
+    expect(buildProxyDescription({ mcpServers: {} }, true)).toContain("use mcpScript");
+    expect(buildProxyDescription({ mcpServers: {}, settings: { scriptMode: true } }, false)).not.toContain("mcpScript");
   });
 
   it("documents the ui-messages action", () => {

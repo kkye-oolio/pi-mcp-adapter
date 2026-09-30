@@ -380,7 +380,7 @@ export function createDirectToolExecutor(
 
       const guarded = await guardMcpOutput(outputContent, {
         ...outputGuardOptions,
-        ...scriptPipeHint(state.config.settings, outputContent),
+        ...scriptPipeHint(state.scriptTool, outputContent),
         ...(state.config.settings?.directToolResultDetails === "bounded" ? { rawMcpResult: result } : {}),
       });
       return {

@@ -485,6 +485,21 @@ describe("mcpAdapter session lifecycle", () => {
     expect(discover({ cwd: "/project", reason: "reload" })).toEqual({ skillPaths: [expectedSkillPath] });
   });
 
+  it("keeps mcpScript guidance on the load-time scriptMode when the session config differs", async () => {
+    const state = createState();
+    state.config = { mcpServers: {}, settings: { scriptMode: true } };
+    mocks.initializeMcp.mockResolvedValue(state);
+
+    const { api, handlers } = await loadAdapter();
+    await handlers.get("session_start")?.({}, { hasUI: false });
+    await vi.waitFor(() => expect(mocks.updateStatusBar).toHaveBeenCalledWith(state));
+
+    expect(registeredTool(api, "mcpScript")).toBeUndefined();
+    expect(state.scriptTool).toBe(false);
+    expect(mocks.buildProxyDescription).toHaveBeenCalledWith(state.config, false);
+    expect(mocks.buildProxyDescription).not.toHaveBeenCalledWith(expect.anything(), true);
+  });
+
   it("keeps the proxy tool when direct tools are still missing from cache", async () => {
     mocks.loadMcpConfig.mockReturnValue({
       mcpServers: {

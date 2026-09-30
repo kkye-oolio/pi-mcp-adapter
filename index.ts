@@ -354,6 +354,8 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
   const earlyConfig = programmaticConfig
     ? resolveConfiguredClaudePluginMcp(cloneMcpConfig(sessionConfig), process.cwd())
     : excludeProjectServersAtLoadTime(loadMcpConfig(earlyConfigPath));
+  // Pi registers tools and discovers skills once per load, so the script tool and every pointer to it follow this value.
+  const scriptTool = earlyConfig.settings?.scriptMode === true;
   const earlyCache = loadMetadataCache();
   const envRaw = process.env.MCP_DIRECT_TOOLS;
   const envDirectToolOverride = parseEnvDirectToolOverride(envRaw);
@@ -973,6 +975,7 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
       };
       const registeredDuringFinalization = new Set<string>();
       let statusPublicationAttempted = false;
+      nextState.scriptTool = scriptTool;
       state = nextState;
       nextState.migrationNotices = [...sessionMigrationNotices];
       finalizationGuard = guard;
@@ -1122,7 +1125,7 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
       ? cloneMcpConfig(sessionConfig)
       : loadMcpConfig(earlyConfigPath, event.cwd);
     const skillPaths = discoverConfiguredClaudePluginSkills(resourceConfig, event.cwd);
-    if (earlyConfig.settings?.scriptMode === true) {
+    if (scriptTool) {
       if (existsSync(scriptingSkillPath) && !skillPaths.includes(scriptingSkillPath)) {
         skillPaths.push(scriptingSkillPath);
       }
@@ -1581,9 +1584,9 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
     },
   });
 
-  if (earlyConfig.settings?.scriptMode === true) {
+  if (scriptTool) {
     // The skill file is manual-only; Pi reads disable-model-invocation from the file and extensions cannot override it.
-    const skillPointer = earlyConfig.settings.scriptSkill === "model"
+    const skillPointer = earlyConfig.settings?.scriptSkill === "model"
       ? ` Before writing a script, read ${scriptingSkillPath} for result shapes and limits.`
       : "";
     (pi.registerTool as (tool: unknown) => unknown)({
@@ -2114,7 +2117,7 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
       || hasEnabledServerWithoutValidMetadata(config, cache, directSpecs);
 
     if (shouldRegisterProxyTool) {
-      const description = buildProxyDescription(config);
+      const description = buildProxyDescription(config, scriptTool);
       if (!proxyToolRegistered || proxyToolDescription !== description) {
         finalizationRegistrations?.add("mcp");
         registerProxyTool(description);
