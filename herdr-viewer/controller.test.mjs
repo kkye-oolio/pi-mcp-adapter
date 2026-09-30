@@ -35,7 +35,6 @@ function fixture({ ready = true, waitMs = 1, lockOptions, omitSplitLabel = false
   const closeCalls = [];
   const focusedPane = "unrelated-focused-pane";
   const browserEntries = new Map();
-  const browserPaneByTerminal = new Map();
   const processByPid = new Map();
   let renameCalls = 0;
 
@@ -111,8 +110,7 @@ function fixture({ ready = true, waitMs = 1, lockOptions, omitSplitLabel = false
       processByPid.set(pid, { start, proc });
       const pane = panes.find(p => p.pane_id === paneId);
       pane.foreground_processes = [proc];
-      const browserPane = { tab: runnerSequence, pane: runnerSequence };
-      browserPaneByTerminal.set(pane.terminal_id, browserPane);
+      const browserPane = { tab: runnerSequence, pane: pane.pane_id };
       browserEntries.set(browserKey, {
         key: browserKey,
         pid: 700 + runnerSequence,
@@ -128,7 +126,7 @@ function fixture({ ready = true, waitMs = 1, lockOptions, omitSplitLabel = false
     },
     async browserList(paneId) {
       const pane = panes.find(p => p.pane_id === paneId);
-      const self = pane ? browserPaneByTerminal.get(pane.terminal_id) ?? { tab: 1, pane: 1 } : null;
+      const self = pane ? { pane: pane.pane_id } : null;
       return { self, browsers: [...browserEntries.values()].map(b => ({ ...b, tabs: [...b.tabs] })) };
     },
     async processStartIdentity(pid) {
@@ -331,6 +329,7 @@ test("a moved pane is found by terminal_id rather than its stored pane_id", asyn
     await f.controller.ensure(BASE);
     const terminalId = f.panes[0].terminal_id;
     f.panes[0].pane_id = "workspace-2:p9";
+    for (const browser of f.browserEntries.values()) browser.pane.pane = f.panes[0].pane_id;
     await f.controller.ensure(BASE);
     assert.equal(f.splitCalls.length, 1);
     assert.equal(f.processCalls.at(-1), "workspace-2:p9");
@@ -385,7 +384,7 @@ test("does not adopt another pane's matching URL or a multi-tab owned browser", 
       key: "other-pane-browser",
       pid: 999,
       socket: "/tmp/other-browser.sock",
-      pane: { tab: 9, pane: 9 },
+      pane: { tab: null, pane: "other-workspace:p9" },
       tabs: [{ url: BASE.url, active: true }],
     });
     await assert.rejects(f.controller.ensure(BASE), /occupied by another process/);
@@ -404,13 +403,13 @@ test("runner registration is selected only from its own browser pane", () => {
   const url = BASE.url;
   const hash = sha256(url);
   const other = {
-    self: { tab: 1, pane: 1 },
-    browsers: [{ key: "other", pid: 2, socket: "/tmp/other.sock", pane: { tab: 2, pane: 2 }, tabs: [{ url, active: true }] }],
+    self: { pane: "wB:p1R" },
+    browsers: [{ key: "other", pid: 2, socket: "/tmp/other.sock", pane: { tab: null, pane: "wB:p99" }, tabs: [{ url, active: true }] }],
   };
   assert.equal(findRegistration(other, hash), undefined);
   const own = {
-    self: { tab: 1, pane: 1 },
-    browsers: [{ key: "owned", pid: 1, socket: "/tmp/owned.sock", pane: { tab: 1, pane: 1 }, tabs: [{ url, active: true }] }],
+    self: { pane: "wB:p1R" },
+    browsers: [{ key: "owned", pid: 1, socket: "/tmp/owned.sock", pane: { tab: null, pane: "wB:p1R" }, tabs: [{ url, active: true }] }],
   };
   assert.equal(findRegistration(own, hash), "owned");
   assert.throws(() => findRegistration({ ...own, browsers: [{ ...own.browsers[0], tabs: [...own.browsers[0].tabs, { url, active: false }] }] }, hash));

@@ -39,14 +39,16 @@ async function processStartIdentity(pid) {
 
 export function findRegistration(value, urlHash) {
   const validId = candidate => (typeof candidate === "string" && candidate.length > 0) || (Number.isSafeInteger(candidate) && candidate >= 0);
-  const validRef = candidate => candidate && typeof candidate === "object" && validId(candidate.tab) && validId(candidate.pane);
-  if (!value || !Array.isArray(value.browsers) || !validRef(value.self)) throw fixedFailure();
+  const validRef = (candidate, self = false) => candidate && typeof candidate === "object"
+    && typeof candidate.pane === "string" && candidate.pane.length > 0
+    && (self && candidate.tab === undefined || candidate.tab === null || validId(candidate.tab));
+  if (!value || !Array.isArray(value.browsers) || !validRef(value.self, true)) throw fixedFailure();
   for (const browser of value.browsers) {
     if (!browser || typeof browser.key !== "string" || browser.key.length === 0 || !Number.isInteger(browser.pid) || typeof browser.socket !== "string" || !validRef(browser.pane) || !Array.isArray(browser.tabs)) throw fixedFailure();
     if (browser.tabs.some(tab => !tab || typeof tab.url !== "string" || typeof tab.active !== "boolean")) throw fixedFailure();
   }
   const { tab, pane } = value.self;
-  const sameRef = candidate => candidate && candidate.tab === tab && candidate.pane === pane;
+  const sameRef = candidate => candidate.pane === pane && (tab === undefined || tab === null || candidate.tab === tab);
   const owned = value.browsers.filter(browser => sameRef(browser.pane));
   if (owned.length > 1) throw fixedFailure();
   if (owned.length === 0) return undefined;

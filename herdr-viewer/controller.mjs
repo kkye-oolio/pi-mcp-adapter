@@ -37,13 +37,15 @@ function parseProcessInfo(value) {
   return info;
 }
 
-function validPaneRef(value) {
+function validPaneRef(value, self = false) {
   const id = candidate => (typeof candidate === "string" && candidate.length > 0) || (Number.isSafeInteger(candidate) && candidate >= 0);
-  return value && typeof value === "object" && id(value.tab) && id(value.pane);
+  if (!value || typeof value !== "object" || typeof value.pane !== "string" || value.pane.length === 0) return false;
+  if (self && value.tab === undefined) return true;
+  return value.tab === null || id(value.tab);
 }
 
 function parseBrowserList(value) {
-  if (!value || !Array.isArray(value.browsers) || !(value.self === null || validPaneRef(value.self))) {
+  if (!value || !Array.isArray(value.browsers) || !(value.self === null || validPaneRef(value.self, true))) {
     fail("terminal-browser registration response is invalid");
   }
   for (const browser of value.browsers) {
@@ -59,8 +61,9 @@ function parseBrowserList(value) {
   return value.browsers;
 }
 
-function samePaneRef(left, right) {
-  return left.tab === right.tab && left.pane === right.pane;
+function samePaneRef(browserPane, self) {
+  if (browserPane.pane !== self.pane) return false;
+  return self.tab === undefined || self.tab === null || browserPane.tab === self.tab;
 }
 
 function ownedBrowser(browsers, self) {
