@@ -20,7 +20,7 @@ const BASE = {
   url: "http://127.0.0.1:51234/?session=synthetic-capability-token",
 };
 
-function fixture({ ready = true, waitMs = 1, lockOptions } = {}) {
+function fixture({ ready = true, waitMs = 1, lockOptions, omitSplitLabel = false } = {}) {
   const home = mkdtempSync(join(tmpdir(), "herdr-controller-test-"));
   const context = { home, socketPath: SOCKET, paneId: "caller-pane", runtimeRoot: join(home, ".local/share/herdr-visual-surface") };
   const store = createStore(context);
@@ -67,7 +67,7 @@ function fixture({ ready = true, waitMs = 1, lockOptions } = {}) {
         pane_id: `workspace-1:p${paneSequence}`,
         terminal_id: `terminal-${paneSequence}`,
         workspace_id: "workspace-1",
-        label: "",
+        ...(omitSplitLabel ? {} : { label: "" }),
         foreground_processes: [],
       };
       panes.push(pane);
@@ -261,6 +261,16 @@ test("first ensure creates a no-focus pane from the caller and never puts the UR
     assert.equal(stateText.includes("synthetic-capability-token"), false);
     assert.equal(f.store.readJson(slot, "launch.json").request.url, BASE.url);
     assert.equal(f.closeCalls.length, 0);
+  });
+});
+
+test("a native pane list may omit label before the returned split is explicitly renamed", async () => {
+  await withFixture({ omitSplitLabel: true }, async f => {
+    await f.controller.ensure(BASE);
+    assert.equal(f.splitCalls.length, 1);
+    assert.equal(f.renameCalls, 1);
+    assert.equal(f.panes[0].label, `Herdr App viewer ${f.runCalls[0].command.match(/attach ([0-9a-f]{64})/)[1].slice(0, 12)}`);
+    assert.equal(f.runCalls.length, 1);
   });
 });
 

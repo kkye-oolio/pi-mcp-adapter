@@ -15,7 +15,8 @@ function parsePaneList(value) {
     fail("Herdr pane list response is invalid");
   }
   for (const pane of value.panes) {
-    if (!pane || typeof pane.pane_id !== "string" || typeof pane.terminal_id !== "string" || typeof pane.workspace_id !== "string" || typeof pane.label !== "string") {
+    if (!pane || typeof pane.pane_id !== "string" || typeof pane.terminal_id !== "string" || typeof pane.workspace_id !== "string"
+      || (pane.label !== undefined && typeof pane.label !== "string")) {
       fail("Herdr pane list response is invalid");
     }
   }
@@ -374,10 +375,19 @@ export function createController({ context, ops, store = createStore(context), l
     if (!result || typeof result.pane_id !== "string" || typeof result.terminal_id !== "string") {
       fail("Herdr pane split response is invalid");
     }
-    const panes = parsePaneList(await listPanes());
-    const matches = panes.filter(pane => pane.terminal_id === result.terminal_id);
-    if (matches.length !== 1 || matches[0].pane_id !== result.pane_id) fail("Herdr pane split response is invalid");
-    return matches[0];
+    const beforeRename = parsePaneList(await listPanes());
+    const matchesBeforeRename = beforeRename.filter(pane => pane.terminal_id === result.terminal_id);
+    if (matchesBeforeRename.length !== 1 || matchesBeforeRename[0].pane_id !== result.pane_id) {
+      fail("Herdr pane split response is invalid");
+    }
+    const label = labelFor(slot);
+    await renamePane(result.pane_id, label);
+    const afterRename = parsePaneList(await listPanes());
+    const matchesAfterRename = afterRename.filter(pane => pane.terminal_id === result.terminal_id);
+    if (matchesAfterRename.length !== 1 || matchesAfterRename[0].pane_id !== result.pane_id || matchesAfterRename[0].label !== label) {
+      fail("Herdr pane split response is invalid");
+    }
+    return matchesAfterRename[0];
   }
 
   async function ensure(request) {
