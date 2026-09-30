@@ -181,11 +181,11 @@ function mergeSameType(left: OutputShape, right: OutputShape): OutputShape {
   return { type: "object", properties, required: (left.required ?? []).filter(key => rightRequired.has(key)) };
 }
 
-/** Drops nesting from the deepest level up until the stored shape fits the size bound. */
+/** Drops nesting from the deepest level up until the rendered shape, which is what describe shows, fits the size bound. */
 function fitShape(shape: OutputShape): OutputShape {
   for (let depth = MAX_DEPTH; depth > 0; depth--) {
     const pruned = pruneShape(shape, depth);
-    if (JSON.stringify(pruned).length <= MAX_SHAPE_CHARS) return pruned;
+    if (renderOutputShape(pruned).length <= MAX_SHAPE_CHARS) return pruned;
   }
   return {};
 }

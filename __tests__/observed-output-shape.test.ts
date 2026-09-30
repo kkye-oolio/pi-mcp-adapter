@@ -84,4 +84,13 @@ describe("observed output shapes", () => {
 
     expect(describeText(state)).toContain("\nRecord<string, { id: string; }>");
   });
+
+  it("keeps a nested list field that sits beside wide objects", async () => {
+    const person = Object.fromEntries(Array.from({ length: 35 }, (_, index) => [`link${index}_url`, "https://example.com"]));
+    const issue = { number: 1, user: person, assignee: person, assignees: [person], labels: [{ name: "bug" }] };
+    const state = stateWith([{ content: [{ type: "text", text: JSON.stringify([issue]) }] }]);
+    await executeCall(state, "demo_list", {});
+
+    expect(describeText(state)).toContain("labels: { name: string; }[];");
+  });
 });
