@@ -470,7 +470,7 @@ describe("mcpAdapter session lifecycle", () => {
   });
 
   it("keeps the bundled mcp-scripting skill aligned with install-time tool visibility after reload", async () => {
-    let config = { mcpServers: {}, claudePlugins: [] } as { mcpServers: {}; claudePlugins: []; settings?: { scriptMode: false } };
+    let config = { mcpServers: {}, claudePlugins: [], settings: { scriptMode: true } } as { mcpServers: {}; claudePlugins: []; settings: { scriptMode: boolean } };
     mocks.loadMcpConfig.mockImplementation(() => structuredClone(config));
     mocks.discoverConfiguredClaudePluginSkills.mockReturnValue([]);
 
@@ -556,6 +556,7 @@ describe("mcpAdapter session lifecycle", () => {
   });
 
   it("does not leak TypeBox internal markers into registered tool parameter schemas", async () => {
+    mocks.loadMcpConfig.mockReturnValue({ mcpServers: {}, settings: { scriptMode: true } });
     const { api } = await loadAdapter();
 
     const collectTildeKeys = (value: unknown, path = "$", keys: string[] = []): string[] => {
@@ -3405,6 +3406,7 @@ describe("mcpAdapter session lifecycle", () => {
     mocks.codeModuleGate = codeGate.promise;
     const initializedState = createState();
     mocks.initializeMcp.mockResolvedValue(initializedState);
+    mocks.loadMcpConfig.mockReturnValue({ mcpServers: {}, settings: { scriptMode: true } });
 
     const { api, handlers } = await loadAdapter();
     await handlers.get("session_start")?.({}, { hasUI: false });
@@ -3569,6 +3571,7 @@ describe("mcpAdapter session lifecycle", () => {
 
   it("refreshes the script owner after retrying failed initialization", async () => {
     mocks.runMcpScript.mockResolvedValue({ content: [{ type: "text", text: "script ok" }] });
+    mocks.loadMcpConfig.mockReturnValue({ mcpServers: {}, settings: { scriptMode: true } });
     const { api } = await loadAfterFailedInitialization();
     const result = await registeredTool(api, "mcpScript").execute(
       "call-1", { code: "emit('ok')" }, undefined, undefined, { hasUI: false, cwd: "/tmp/retry-script" },

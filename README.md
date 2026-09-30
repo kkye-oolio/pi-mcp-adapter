@@ -607,7 +607,8 @@ When any enabled server uses `eager` or `keep-alive`, initialization also starts
 | `directToolResultDetails` | Direct-tool result details: `"lean"` (default) or `"bounded"` to retain the guarded raw MCP result. |
 | `warnOnLargeDirectTools` | Show the advisory when 75 or more direct tools resolve (default: `true`). Set to `false` to suppress only this advisory. |
 | `freezeDirectTools` | Keep direct-tool registration stable after the initial sync so metadata updates and explicit reconnects do not rebuild the system prompt. Proxy/search/cache metadata still refreshes. Default: false. |
-| `scriptMode` | Register the MCP-only `mcpScript` plain-JavaScript tool (default: true). Set to `false` to hide it. |
+| `scriptMode` | Register the MCP-only `mcpScript` plain-JavaScript tool and its bundled skill (default: false). |
+| `scriptSkill` | How the model finds the bundled `mcp-scripting` skill when `scriptMode` is on: `"manual"` (default) keeps it to `/skill:mcp-scripting`; `"model"` adds its path to the `mcpScript` description so the model reads it before writing a script. |
 | `exposeResources` | Expose MCP resources as tools (default: `true`). Set to `false` to disable globally across all servers. Per-server `exposeResources` overrides this. |
 | `jev` | Optional System One Jev settings. A valid System One key enables semantic search across every enabled MCP server by default; `semanticSearch: false` disables it. `scriptEvaluation` remains disabled by default and requires an `allowedServers` source allowlist when enabled. `jev: false` disables both. Run `/mcp-adapter jev setup` for guided configuration. |
 | `disableProxyTool` | Hide the `mcp` proxy tool once configured direct tools are fully available from cache. Ignored while any server uses `directTools: "search"`, whose tools are registered inactive and can only be activated through the gateway (`mcp({ search })` or a successful `mcp({ tool })` call). |
@@ -759,9 +760,9 @@ Optional `jev` controls bound timeout/retries, request and script budgets, seman
 
 Semantic search sends your request and the available tool descriptions to Jev, which works out which tools best match what you’re trying to do. In a live test with 12 everyday requests and 95 tools and resources, Jev chose the expected result first in 10 of 11 answerable cases and placed it second once. Regular text search found the expected result first in 5 cases. Jev also correctly returned no result for an unrelated request. This was a small test using one local setup, so results will vary with different tools and queries.
 
-For multi-call MCP work, write ordinary JavaScript: discover, inspect, call, loop, filter, chain, or fan out, then return one result. Run that code with the default-on `mcpScript` tool. For a single MCP call, search, describe, status check, or auth action, use `mcp` instead. Set `settings.scriptMode` to `false` to hide both the scripting tool and its bundled skill.
+For multi-call MCP work, write ordinary JavaScript: discover, inspect, call, loop, filter, chain, or fan out, then return one result. Run that code with the `mcpScript` tool, which is off by default; set `settings.scriptMode` to `true` to register it and its bundled skill. For a single MCP call, search, describe, status check, or auth action, use `mcp` instead.
 
-The bundled `mcp-scripting` skill is manual-only by default, so its description is not added to the model's automatic skill context. Use `/skill:mcp-scripting` when you want its detailed workflow.
+The bundled `mcp-scripting` skill is manual-only: use `/skill:mcp-scripting`, or set `settings.scriptSkill` to `"model"` so the `mcpScript` description tells the model where to read it.
 
 For example, this is the JavaScript passed as the `code` argument to `mcpScript`:
 

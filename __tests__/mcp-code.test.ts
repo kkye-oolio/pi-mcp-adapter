@@ -32,9 +32,9 @@ function textBlocks(result: Awaited<ReturnType<typeof runMcpScript>>): string[] 
 }
 
 describe("runMcpScript", () => {
-  it("registers mcpScript by default", () => {
+  it("registers mcpScript when scriptMode is true", () => {
     const registerTool = vi.fn();
-    createMcpAdapter({ config: { settings: {}, mcpServers: {} } })({
+    createMcpAdapter({ config: { settings: { scriptMode: true }, mcpServers: {} } })({
       registerTool,
       registerFlag: vi.fn(),
       registerCommand: vi.fn(),
@@ -49,13 +49,28 @@ describe("runMcpScript", () => {
       promptSnippet: "Batch multiple MCP tool calls in one JavaScript request (loop, filter, chain)",
     }));
     const scriptTool = registerTool.mock.calls.find(([tool]) => tool.name === "mcpScript")?.[0];
-    expect(scriptTool.description).not.toContain("Load the mcp-scripting skill");
+    expect(scriptTool.description).not.toContain("SKILL.md");
     expect(registerTool).not.toHaveBeenCalledWith(expect.objectContaining({ name: "mcp_script" }));
   });
 
-  it("skips mcpScript when scriptMode is false", () => {
+  it("points mcpScript at the scripting skill when scriptSkill is model", () => {
     const registerTool = vi.fn();
-    createMcpAdapter({ config: { settings: { scriptMode: false }, mcpServers: {} } })({
+    createMcpAdapter({ config: { settings: { scriptMode: true, scriptSkill: "model" }, mcpServers: {} } })({
+      registerTool,
+      registerFlag: vi.fn(),
+      registerCommand: vi.fn(),
+      on: vi.fn(),
+      events: { on: vi.fn(), emit: vi.fn() },
+      getAllTools: vi.fn(() => []),
+    } as any);
+
+    const scriptTool = registerTool.mock.calls.find(([tool]) => tool.name === "mcpScript")?.[0];
+    expect(scriptTool.description).toContain("skills/mcp-scripting/SKILL.md");
+  });
+
+  it("skips mcpScript by default", () => {
+    const registerTool = vi.fn();
+    createMcpAdapter({ config: { settings: {}, mcpServers: {} } })({
       registerTool,
       registerFlag: vi.fn(),
       registerCommand: vi.fn(),

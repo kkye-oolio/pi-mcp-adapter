@@ -1116,13 +1116,13 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
     });
   }
 
+  const scriptingSkillPath = fileURLToPath(new URL("./skills/mcp-scripting/SKILL.md", import.meta.url));
   pi.on("resources_discover", (event) => {
     const resourceConfig = programmaticConfig
       ? cloneMcpConfig(sessionConfig)
       : loadMcpConfig(earlyConfigPath, event.cwd);
     const skillPaths = discoverConfiguredClaudePluginSkills(resourceConfig, event.cwd);
-    if (earlyConfig.settings?.scriptMode !== false) {
-      const scriptingSkillPath = fileURLToPath(new URL("./skills/mcp-scripting/SKILL.md", import.meta.url));
+    if (earlyConfig.settings?.scriptMode === true) {
       if (existsSync(scriptingSkillPath) && !skillPaths.includes(scriptingSkillPath)) {
         skillPaths.push(scriptingSkillPath);
       }
@@ -1581,11 +1581,15 @@ function installMcpAdapter(pi: ExtensionAPI, options: McpAdapterOptions) {
     },
   });
 
-  if (earlyConfig.settings?.scriptMode !== false) {
+  if (earlyConfig.settings?.scriptMode === true) {
+    // The skill file is manual-only; Pi reads disable-model-invocation from the file and extensions cannot override it.
+    const skillPointer = earlyConfig.settings.scriptSkill === "model"
+      ? ` Before writing a script, read ${scriptingSkillPath} for result shapes and limits.`
+      : "";
     (pi.registerTool as (tool: unknown) => unknown)({
       name: "mcpScript",
       label: "MCP Script",
-      description: "Run sandboxed JavaScript that makes multiple MCP tool calls in one request — loop, filter, chain, or fan out between calls. For a single MCP call, search, describe, status check, or auth action, use the mcp tool instead. Discover with await tools.search({ query }) — resolves to { items: [{ path, name, server, description? }], total, hasMore, nextOffset }, not an { ok, data } envelope. Inspect with await tools.describe({ path }) — resolves to the tool descriptor with inputTypeScript, or { path, error: { code, message, suggestions } }. Then call tools.call(path, args) — resolves to { ok: true, data } or { ok: false, error: { code, message } } — or use direct flat calls when the name is already known. For tools, data is the raw MCP result { content, structuredContent? }: use data.structuredContent when present, otherwise JSON usually needs JSON.parse(data.content[0].text). Use emit(value) for user-visible output.",
+      description: "Run sandboxed JavaScript that makes multiple MCP tool calls in one request — loop, filter, chain, or fan out between calls. For a single MCP call, search, describe, status check, or auth action, use the mcp tool instead. Discover with await tools.search({ query }) — resolves to { items: [{ path, name, server, description? }], total, hasMore, nextOffset }, not an { ok, data } envelope. Inspect with await tools.describe({ path }) — resolves to the tool descriptor with inputTypeScript, or { path, error: { code, message, suggestions } }. Then call tools.call(path, args) — resolves to { ok: true, data } or { ok: false, error: { code, message } } — or use direct flat calls when the name is already known. For tools, data is the raw MCP result { content, structuredContent? }: use data.structuredContent when present, otherwise JSON usually needs JSON.parse(data.content[0].text). Use emit(value) for user-visible output." + skillPointer,
       promptSnippet: "Batch multiple MCP tool calls in one JavaScript request (loop, filter, chain)",
       parameters: Type.Object({
         code: Type.String({ description: "Sandboxed JavaScript MCP script. Use tools.<prefixedToolName>(args) and emit(value)." }),

@@ -59,6 +59,11 @@ describe("formatToolName", () => {
 });
 
 describe("buildProxyDescription", () => {
+  it("points to mcpScript only when scriptMode is on", () => {
+    expect(buildProxyDescription({ mcpServers: {}, settings: { scriptMode: true } })).toContain("use mcpScript");
+    expect(buildProxyDescription({ mcpServers: {} })).not.toContain("mcpScript");
+  });
+
   it("documents the ui-messages action", () => {
     const config: McpConfig = {
       mcpServers: {
@@ -74,7 +79,6 @@ describe("buildProxyDescription", () => {
     expect(description).toContain('mcp({ action: "ui-messages" })');
     expect(description).toContain("Retrieve accumulated messages from completed UI sessions");
     expect(description).toContain("server status, tool search/describe, auth, and single MCP tool calls");
-    expect(description).toContain("When one request needs several MCP calls with logic between them, use mcpScript.");
     expect(description).toContain("Search MCP tools by name/description");
     expect(description).toContain("Non-MCP Pi tools should be called directly, not through mcp.");
     expect(description).not.toContain("MCP + pi");
